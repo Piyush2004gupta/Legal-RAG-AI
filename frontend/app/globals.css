@@ -1,0 +1,275 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --navy-950: #020609;
+    --navy-900: #040C16;
+    --navy-800: #091525;
+    --navy-700: #0F2035;
+    --navy-600: #162D4A;
+    --navy-500: #1E3A5F;
+    --navy-400: #2A517E;
+    --navy-300: #3D6E9E;
+    --gold-500: #B8860B;
+    --gold-400: #D4A017;
+    --gold-300: #E8C547;
+  }
+
+  * {
+    @apply border-navy-600;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  body {
+    background: #0B1929;
+    color: #E2E8F0;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-track {
+    background: #091525;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #1E3A5F;
+    border-radius: 4px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #2A517E;
+  }
+}
+
+@layer components {
+  /* Glassmorphism card */
+  .glass-card {
+    @apply bg-navy-700/60 backdrop-blur-sm border border-navy-500/50 rounded-xl;
+  }
+
+  /* Premium button */
+  .btn-primary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-gold-500 hover:bg-gold-400 
+           text-navy-900 font-semibold rounded-lg transition-all duration-200 
+           shadow-lg shadow-gold-500/20 hover:shadow-gold-400/30 
+           active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-secondary {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-navy-600 hover:bg-navy-500 
+           text-white font-medium rounded-lg border border-navy-400/50 
+           transition-all duration-200 active:scale-95 
+           disabled:opacity-50 disabled:cursor-not-allowed;
+  }
+
+  .btn-ghost {
+    @apply inline-flex items-center gap-2 px-3 py-2 text-slate-400 hover:text-white 
+           hover:bg-navy-600/50 rounded-lg transition-all duration-200;
+  }
+
+  .btn-danger {
+    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-900/50 hover:bg-red-800/70 
+           text-red-300 hover:text-red-200 font-medium rounded-lg border border-red-800/50 
+           transition-all duration-200 active:scale-95;
+  }
+
+  /* Input styling */
+  .input {
+    @apply w-full bg-navy-800 border border-navy-500/60 rounded-lg px-3 py-2 
+           text-white placeholder:text-slate-500 focus:outline-none 
+           focus:border-gold-500 focus:ring-1 focus:ring-gold-500/30 
+           transition-all duration-200;
+  }
+
+  .label {
+    @apply text-sm font-medium text-slate-300 mb-1 block;
+  }
+
+  /* Status badges */
+  .badge {
+    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  .badge-gold {
+    @apply badge bg-gold-500/20 text-gold-300 border border-gold-500/30;
+  }
+
+  .badge-blue {
+    @apply badge bg-blue-500/20 text-blue-300 border border-blue-500/30;
+  }
+
+  .badge-green {
+    @apply badge bg-emerald-500/20 text-emerald-300 border border-emerald-500/30;
+  }
+
+  .badge-red {
+    @apply badge bg-red-500/20 text-red-300 border border-red-500/30;
+  }
+
+  .badge-yellow {
+    @apply badge bg-yellow-500/20 text-yellow-300 border border-yellow-500/30;
+  }
+
+  .badge-gray {
+    @apply badge bg-slate-500/20 text-slate-300 border border-slate-500/30;
+  }
+
+  /* Citation card */
+  .citation-card {
+    @apply glass-card p-3 hover:border-gold-500/40 cursor-pointer 
+           transition-all duration-200 hover:shadow-lg hover:shadow-gold-500/10;
+  }
+
+  /* Section tab */
+  .tab-active {
+    @apply text-gold-400 border-b-2 border-gold-400 font-semibold;
+  }
+
+  .tab-inactive {
+    @apply text-slate-400 hover:text-slate-200 border-b-2 border-transparent 
+           hover:border-navy-400 transition-all duration-200;
+  }
+
+  /* Sidebar nav item */
+  .nav-item {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg text-slate-400 
+           hover:text-white hover:bg-navy-600/50 transition-all duration-200 
+           cursor-pointer text-sm font-medium;
+  }
+
+  .nav-item-active {
+    @apply flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gold-500/15 
+           text-gold-300 border border-gold-500/25 text-sm font-semibold;
+  }
+
+  /* Processing indicator */
+  .processing-dot {
+    @apply w-2 h-2 rounded-full bg-gold-400 animate-pulse;
+  }
+
+  /* Disclaimer banner */
+  .disclaimer {
+    @apply flex items-start gap-2 px-3 py-2 bg-amber-900/20 border border-amber-700/30 
+           rounded-lg text-amber-300 text-xs;
+  }
+
+  /* Empty state */
+  .empty-state {
+    @apply flex flex-col items-center justify-center py-16 text-center;
+  }
+
+  /* Gradient text */
+  .gradient-text {
+    @apply bg-gradient-to-r from-gold-300 to-gold-500 bg-clip-text text-transparent;
+  }
+
+  /* Shimmer loading */
+  .shimmer {
+    @apply animate-pulse bg-navy-600/50 rounded;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+}
+
+/* Prose styles for markdown content */
+.prose-legal {
+  color: #CBD5E1;
+  line-height: 1.75;
+}
+
+.prose-legal h1, .prose-legal h2, .prose-legal h3 {
+  color: #E2E8F0;
+  font-weight: 600;
+  margin-top: 1.5em;
+  margin-bottom: 0.5em;
+}
+
+.prose-legal h1 { font-size: 1.5rem; }
+.prose-legal h2 { font-size: 1.25rem; }
+.prose-legal h3 { font-size: 1.125rem; color: #B8860B; }
+
+.prose-legal p { margin-bottom: 0.75em; }
+
+.prose-legal strong { color: #E2E8F0; font-weight: 600; }
+
+.prose-legal ul, .prose-legal ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75em;
+}
+
+.prose-legal li { margin-bottom: 0.25em; }
+
+.prose-legal blockquote {
+  border-left: 3px solid #B8860B;
+  padding-left: 1rem;
+  color: #94A3B8;
+  font-style: italic;
+  margin: 1rem 0;
+}
+
+.prose-legal code {
+  background: #0F2035;
+  padding: 0.1em 0.4em;
+  border-radius: 4px;
+  font-size: 0.875em;
+  color: #B8860B;
+}
+
+.prose-legal hr {
+  border-color: #1E3A5F;
+  margin: 1.5rem 0;
+}
+
+/* Citation highlights in chat */
+.citation-ref {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(184, 134, 11, 0.15);
+  border: 1px solid rgba(184, 134, 11, 0.3);
+  color: #D4A017;
+  border-radius: 4px;
+  padding: 0 6px;
+  font-size: 0.8em;
+  font-weight: 500;
+  cursor: pointer;
+  margin: 0 2px;
+  transition: all 0.15s;
+}
+
+.citation-ref:hover {
+  background: rgba(184, 134, 11, 0.3);
+}
+
+/* Custom scrollbar for chat */
+.chat-scroll::-webkit-scrollbar {
+  width: 4px;
+}
+
+/* Upload drop zone */
+.drop-zone {
+  @apply border-2 border-dashed border-navy-400/50 rounded-xl p-8
+         hover:border-gold-500/50 transition-all duration-300 cursor-pointer;
+}
+
+.drop-zone-active {
+  @apply border-gold-500 bg-gold-500/5;
+}
+
+/* Progress bar */
+.progress-bar {
+  @apply h-1.5 bg-navy-600 rounded-full overflow-hidden;
+}
+
+.progress-fill {
+  @apply h-full bg-gradient-to-r from-gold-600 to-gold-400 rounded-full transition-all duration-500;
+}
