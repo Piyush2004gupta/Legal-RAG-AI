@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     ]
 
     # Upload limits
-    MAX_UPLOAD_SIZE_MB: int = 50
+    MAX_UPLOAD_SIZE_MB: int = 500  # 500MB max per bundle for large 5000+ page cases
     ALLOWED_MIME_TYPES: List[str] = [
         "application/pdf",
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -56,13 +56,13 @@ class Settings(BaseSettings):
     # RAG settings
     CHUNK_SIZE: int = 800           # tokens per chunk
     CHUNK_OVERLAP: int = 150        # overlap tokens
-    TOP_K_RETRIEVAL: int = 20       # chunks to retrieve
-    TOP_K_RERANK: int = 8           # chunks after reranking
-    SIMILARITY_THRESHOLD: float = 0.25
+    TOP_K_RETRIEVAL: int = 25       # chunks to retrieve across large corpus
+    TOP_K_RERANK: int = 10          # chunks after reranking
+    SIMILARITY_THRESHOLD: float = 0.22
 
     # Processing
     MAX_JOB_ATTEMPTS: int = 3
-    JOB_TIMEOUT_SECONDS: int = 600
+    JOB_TIMEOUT_SECONDS: int = 3600  # Up to 1 hour for 5000+ page processing
 
     # Default workspace
     DEFAULT_WORKSPACE_ID: str = "00000000-0000-0000-0000-000000000001"

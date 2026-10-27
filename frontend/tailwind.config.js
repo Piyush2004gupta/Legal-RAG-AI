@@ -34,16 +34,25 @@ module.exports = {
           900: '#221803',
         },
         legal: {
-          bg: '#0B1929',
-          surface: '#0F2035',
-          border: '#1E3A5F',
-          accent: '#B8860B',
-          highlight: '#1E4D8C',
+          bg: '#F1F5F9',
+          surface: '#FFFFFF',
+          border: '#E2E8F0',
+          accent: '#0284C7',
+          highlight: '#38BDF8',
+        },
+        sidebar: {
+          bg: '#0C1E36',
+          hover: '#132B4C',
+          active: '#17345C',
+          border: 'rgba(255, 255, 255, 0.07)',
+          text: '#94A3B8',
+          accent: '#38BDF8',
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        serif: ['Crimson Pro', 'Georgia', 'serif'],
+        sans: ['"Plus Jakarta Sans"', 'Inter', 'system-ui', 'sans-serif'],
+        serif: ['"Playfair Display"', 'Crimson Pro', 'Georgia', 'serif'],
+        mono: ['"JetBrains Mono"', 'monospace'],
       },
       animation: {
         'fade-in': 'fadeIn 0.3s ease-in-out',

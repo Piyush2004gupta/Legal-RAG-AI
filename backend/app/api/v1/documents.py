@@ -92,6 +92,27 @@ async def get_document_page(
     return page
 
 
+@router.post("/{document_id}/reprocess", status_code=202)
+async def reprocess_document(
+    case_id: str,
+    document_id: str,
+    background_tasks: BackgroundTasks,
+    store: LocalDataStore = Depends(get_store),
+):
+    """Re-trigger ingestion pipeline for a failed or stale document."""
+    doc = store.get_document(document_id)
+    if not doc or doc.get("case_id") != case_id:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    store.update_document(document_id, {
+        "processing_status": "processing",
+        "processing_error": None,
+    })
+    pipeline = DocumentIngestionPipeline(store)
+    background_tasks.add_task(pipeline.process_document, document_id)
+    return {"message": "Reprocessing started", "document_id": document_id}
+
+
 @router.get("/{document_id}/file")
 async def download_document_file(
     case_id: str, document_id: str, store: LocalDataStore = Depends(get_store)

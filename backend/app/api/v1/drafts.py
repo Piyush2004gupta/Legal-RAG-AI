@@ -188,3 +188,76 @@ async def export_docx(case_id: str, draft_id: str, store: LocalDataStore = Depen
         media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@router.get("/{draft_id}/export/pdf")
+async def export_pdf(case_id: str, draft_id: str, store: LocalDataStore = Depends(get_store)):
+    draft = store.get_draft(draft_id)
+    if not draft or draft.get("case_id") != case_id:
+        raise HTTPException(status_code=404, detail="Draft not found")
+
+    import io
+    from reportlab.lib.pagesizes import letter, A4
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib import colors
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=A4,
+        rightMargin=54,
+        leftMargin=54,
+        topMargin=54,
+        bottomMargin=54
+    )
+
+    styles = getSampleStyleSheet()
+    title_style = ParagraphStyle(
+        'LegalTitle',
+        parent=styles['Heading1'],
+        fontName='Helvetica-Bold',
+        fontSize=14,
+        leading=18,
+        alignment=1, # Center
+        textColor=colors.HexColor('#0F172A'),
+        spaceAfter=14
+    )
+    body_style = ParagraphStyle(
+        'LegalBody',
+        parent=styles['Normal'],
+        fontName='Helvetica',
+        fontSize=10,
+        leading=15,
+        textColor=colors.HexColor('#1E293B'),
+        spaceAfter=6
+    )
+
+    story = []
+    title_text = draft.get("title", "LEGAL DRAFT").upper()
+    story.append(Paragraph(title_text, title_style))
+    story.append(Spacer(1, 12))
+
+    raw_content = draft.get("content", "")
+    # Clean markdown triple backticks if present
+    clean_content = raw_content.replace("```plaintext", "").replace("```markdown", "").replace("```", "").strip()
+
+    for line in clean_content.split("\n"):
+        line_str = line.strip()
+        if not line_str:
+            story.append(Spacer(1, 6))
+        else:
+            # Escape HTML chars for ReportLab Paragraph
+            safe_text = line_str.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            story.append(Paragraph(safe_text, body_style))
+
+    doc.build(story)
+    buffer.seek(0)
+
+    filename = f"{draft.get('draft_type', 'LegalDraft')}_{draft_id[:8]}.pdf"
+    return Response(
+        content=buffer.getvalue(),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+

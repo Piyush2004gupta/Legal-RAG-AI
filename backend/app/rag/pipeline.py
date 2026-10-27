@@ -1,7 +1,7 @@
 """
-RAG Query Pipeline - Zero-Database Implementation.
-Combines vector cosine similarity search over LocalDataStore embeddings,
-keyword search, grounded prompt synthesis, and citation extraction.
+RAG Query Pipeline - Enterprise-Grade Legal Intelligence Implementation.
+Combines hybrid vector similarity + BM25 keyword search, reciprocal rank fusion,
+strict legal-only domain guardrails, grounded prompt synthesis, and inline citations.
 """
 import re
 import time
@@ -11,30 +11,55 @@ import structlog
 from app.core.config import settings
 from app.core.store import LocalDataStore, store
 from app.core.openai_client import create_embeddings, chat_completion
+from app.retrieval.retriever import HybridRetriever
+from app.prompts.templates import (
+    RAG_SYSTEM_PROMPT,
+    build_rag_user_prompt,
+    NO_ANSWER_RESPONSE,
+    NON_LEGAL_REFUSAL_MESSAGE,
+)
 
 log = structlog.get_logger()
 
-NO_ANSWER_RESPONSE = (
-    "I could not find reliable support for this answer in the available case documents. "
-    "Please upload relevant case documents or consult a qualified advocate."
-)
+# Common non-legal / off-topic keywords to guard against casual or abusive non-legal queries
+# Grouped by category for easier maintenance
+NON_LEGAL_TRIGGERS = [
+    # Food / cooking
+    "recipe", "how to cook", "how to bake", "bake a", "pasta recipe", "biryani", "pizza",
+    "burger recipe", "chicken recipe", "dal recipe", "roti", "cooking tips",
+    # Coding / technology (non-legal)
+    "write a python", "write python code", "write javascript", "write html", "write css",
+    "write code for", "debug this code", "fix my code", "write a function", "write a program",
+    "explain this algorithm", "leetcode", "data structure", "machine learning model",
+    # Sports / entertainment
+    "cricket match", "football match", "ipl score", "world cup score", "who won the match",
+    "ipl 2024", "t20 score", "movie review", "latest movies", "box office",
+    "hollywood movies", "bollywood movies", "web series", "netflix show", "amazon prime",
+    # Jokes / creative writing
+    "tell me a joke", "write a poem", "write a song", "sing a song", "tell me a story",
+    "write a story", "write an essay", "write a letter to my friend",
+    # Weather / travel
+    "weather today", "weather forecast", "temperature today", "will it rain",
+    "travel tips", "tourist places", "best restaurants",
+    # Personal / lifestyle
+    "dating advice", "relationship tips", "horoscope", "astrology", "zodiac sign",
+    "love advice", "breakup advice", "weight loss tips", "fitness tips", "diet plan",
+    # General chat that is clearly non-legal
+    "who is the president of", "capital of india", "what is 2+2", "translate this to hindi",
+    "make me laugh", "are you gpt", "are you chatgpt", "who made you",
+]
 
-SYSTEM_PROMPT = """You are LegalDesk AI, a specialized AI legal research assistant for Indian advocates and courts.
 
-CRITICAL INSTRUCTIONS:
-1. Base your answer STRICTLY on the retrieved case document excerpts provided below.
-2. For EVERY claim, fact, or legal provision mentioned, cite the exact source using format: [DocName, Page N].
-3. If the documents do not contain the answer, state clearly: "Based on the uploaded documents, this information is not available."
-4. Never invent or hallucinate judgments, section numbers, parties, dates, or case citations.
-5. Emphasize Indian law provisions (IPC/BNS, CrPC/BNSS, Evidence Act/BSA, Constitution of India) accurately as found in the text.
-6. Provide clear, professional legal analysis formatted with structured headings and bullet points.
-7. Conclude with a brief reminder that this analysis requires professional legal verification.
-"""
+def is_non_legal_prompt(text: str) -> bool:
+    """Detect queries that are unambiguously non-legal and out of legal scope."""
+    cleaned = text.lower().strip()
+    return any(trigger in cleaned for trigger in NON_LEGAL_TRIGGERS)
 
 
 class RAGQueryPipeline:
     def __init__(self, datastore: Optional[LocalDataStore] = None):
         self.store = datastore or store
+        self.retriever = HybridRetriever(datastore=self.store, vector_weight=0.70, use_rrf=True)
 
     async def query(
         self,
@@ -45,72 +70,140 @@ class RAGQueryPipeline:
     ) -> dict:
         start_time = time.time()
 
+        # -------------------------------------------------------------
+        # Guardrail 1: Fast rejection for blatantly non-legal questions
+        # -------------------------------------------------------------
+        if is_non_legal_prompt(question):
+            latency_ms = int((time.time() - start_time) * 1000)
+            if session_id:
+                self.store.add_chat_message(
+                    session_id=session_id,
+                    case_id=case_id,
+                    role="user",
+                    content=question,
+                )
+                self.store.add_chat_message(
+                    session_id=session_id,
+                    case_id=case_id,
+                    role="assistant",
+                    content=NON_LEGAL_REFUSAL_MESSAGE,
+                    citations=[],
+                )
+            return {
+                "answer": NON_LEGAL_REFUSAL_MESSAGE,
+                "citations": [],
+                "sources_used": 0,
+                "latency_ms": latency_ms,
+            }
+
+        # -------------------------------------------------------------
         # 1. Embed query
+        # -------------------------------------------------------------
         embeddings = await create_embeddings([question])
         query_embedding = embeddings[0] if embeddings else []
 
-        # 2. Extract keywords for hybrid ranking
-        keywords = [w for w in re.findall(r"\w+", question.lower()) if len(w) > 2]
-
-        # 3. Retrieve relevant chunks from local store
-        matched_chunks = self.store.search_chunks(
-            case_id=case_id,
+        # -------------------------------------------------------------
+        # 2. Hybrid Retrieval: Vector Cosine + BM25 Keyword Scoring + RRF
+        # -------------------------------------------------------------
+        matched_chunks = await self.retriever.retrieve(
+            query=question,
             query_embedding=query_embedding,
-            keywords=keywords,
-            doc_ids=document_ids,
+            case_id=case_id,
             top_k=settings.TOP_K_RERANK,
             min_similarity=settings.SIMILARITY_THRESHOLD,
+            doc_ids=document_ids,
         )
 
+        # Fallback to store.search_chunks if retriever returned empty but store has records
         if not matched_chunks:
+            keywords = [w for w in re.findall(r"\w+", question.lower()) if len(w) > 2]
+            matched_chunks = self.store.search_chunks(
+                case_id=case_id,
+                query_embedding=query_embedding,
+                keywords=keywords,
+                doc_ids=document_ids,
+                top_k=settings.TOP_K_RERANK,
+                min_similarity=settings.SIMILARITY_THRESHOLD,
+            )
+
+        if not matched_chunks:
+            latency_ms = int((time.time() - start_time) * 1000)
+            if session_id:
+                self.store.add_chat_message(
+                    session_id=session_id,
+                    case_id=case_id,
+                    role="user",
+                    content=question,
+                )
+                self.store.add_chat_message(
+                    session_id=session_id,
+                    case_id=case_id,
+                    role="assistant",
+                    content=NO_ANSWER_RESPONSE,
+                    citations=[],
+                )
             return {
                 "answer": NO_ANSWER_RESPONSE,
                 "citations": [],
                 "sources_used": 0,
-                "latency_ms": int((time.time() - start_time) * 1000),
+                "latency_ms": latency_ms,
             }
 
-        # 4. Build prompt context with page numbers and document names
+        # -------------------------------------------------------------
+        # 3. Assemble Grounded Context Excerpts & Citations
+        # -------------------------------------------------------------
         context_parts = []
         citations_available = []
 
         for i, chunk in enumerate(matched_chunks):
-            doc_name = chunk.get("original_filename", "Document")
+            doc_id = chunk.get("document_id")
+            doc = self.store.get_document(doc_id) if doc_id else None
+            doc_name = (
+                chunk.get("original_filename")
+                or (doc.get("original_filename") if doc else None)
+                or "Document"
+            )
             page_num = chunk.get("page_number", 1)
-            text_snippet = chunk.get("chunk_text", "")
+            text_snippet = chunk.get("chunk_text", "").strip()
+
             context_parts.append(
                 f"[Source {i+1} | Document: '{doc_name}' | Page {page_num}]\n{text_snippet}\n"
             )
             citations_available.append({
                 "source_id": i + 1,
-                "document_id": chunk.get("document_id"),
+                "document_id": doc_id,
                 "document_name": doc_name,
                 "page_number": page_num,
-                "snippet": text_snippet[:200] + "...",
+                "snippet": text_snippet[:220] + ("..." if len(text_snippet) > 220 else ""),
                 "similarity_score": round(chunk.get("similarity_score", 0.0), 3),
             })
 
         context_str = "\n".join(context_parts)
 
-        # 5. Call OpenAI Chat Completion
+        # -------------------------------------------------------------
+        # 4. Strictly Grounded Legal Prompting
+        # -------------------------------------------------------------
         messages = [
-            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "system", "content": RAG_SYSTEM_PROMPT},
             {
                 "role": "user",
-                "content": f"CASE CONTEXT:\n{context_str}\n\nADVOCATE'S QUESTION:\n{question}\n\nPlease provide a detailed, verified legal answer with citations [DocName, Page N].",
+                "content": build_rag_user_prompt(context=context_str, question=question),
             },
         ]
 
+        # Temperature = 0.0 for zero hallucination, strictly factual legal responses
         completion = await chat_completion(
             messages=messages,
-            temperature=0.1,
-            max_tokens=2048,
+            temperature=0.0,
+            max_tokens=2500,
         )
 
-        answer = completion.get("content", "")
+        answer = completion.get("content", "").strip()
         latency_ms = int((time.time() - start_time) * 1000)
 
-        # 6. Save messages if session_id provided
+        # -------------------------------------------------------------
+        # 5. Save Q&A to Session History
+        # -------------------------------------------------------------
         if session_id:
             self.store.add_chat_message(
                 session_id=session_id,
